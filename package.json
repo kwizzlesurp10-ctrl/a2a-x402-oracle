@@ -1,0 +1,27 @@
+{
+  "name": "a2a-x402-oracle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A2A-x402 Oracle — paid demand intelligence and counsel for Agent-to-Agent commerce that settles on x402.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^15.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
