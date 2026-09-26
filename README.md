@@ -1,6 +1,10 @@
 # A2A-x402 Oracle
 
-Paid demand intelligence and counsel for **Agent-to-Agent commerce that settles on x402**.
+> Paid demand intelligence and counsel for **Agent-to-Agent commerce that settles on x402**.
+
+## Status
+- Repo: L4 RepoForge
+- License: Apache-2.0
 
 Humans subscribe. Agents pay USDC on Base. A call that does not return a live `402` + `accepts[]` cannot rank as top paying.
 
@@ -8,4 +12,11 @@ Humans subscribe. Agents pay USDC on Base. A call that does not return a live `4
 
 Live: after Vercel attach, probes at `/api/health` and unpaid `POST /api/v1/consult` must 402.
 
-See DEPLOY.md and MARKETING.md.
+See [DEPLOY.md](DEPLOY.md) and [MARKETING.md](MARKETING.md).
+
+## Security
+See [SECURITY.md](SECURITY.md).
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+## License
+See [LICENSE](LICENSE).
