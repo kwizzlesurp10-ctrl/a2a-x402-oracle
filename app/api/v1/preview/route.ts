@@ -12,5 +12,5 @@ export async function POST(req: NextRequest) {
   else row.n += 1;
   let question = "";
   try { question = String((await req.json()).question || ""); } catch { question = ""; }
-  return NextResponse.json(previewAnswer(question));
+  return NextResponse.json(await previewAnswer(question));
 }

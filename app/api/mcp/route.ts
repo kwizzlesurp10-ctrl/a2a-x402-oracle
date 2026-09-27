@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     if (sku.free) return ok(rpc.id, { content: [{ type: "text", text: JSON.stringify(healthPayload()) }] });
     const gate = gateRequest(req, sku.id);
     if (!gate.ok) return NextResponse.json({ jsonrpc: "2.0", id: rpc.id ?? null, error: { code: 402, message: "Payment required", data: paymentRequiredBody(gate.sku) } }, { status: 402 });
-    return ok(rpc.id, { content: [{ type: "text", text: JSON.stringify(paidWisdom(sku, { ...args, sku: sku.id }, gate.mode)) }] });
+    return ok(rpc.id, { content: [{ type: "text", text: JSON.stringify(await paidWisdom(sku, { ...args, sku: sku.id }, gate.mode)) }] });
   }
   return err(rpc.id, -32601, `Method not found: ${method}`);
 }

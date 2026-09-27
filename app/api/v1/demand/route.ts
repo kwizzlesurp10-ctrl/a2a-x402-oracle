@@ -10,5 +10,5 @@ export async function POST(req: NextRequest) {
   const sku = skuById(allowed)!;
   const gate = gateRequest(req, sku.id);
   if (!gate.ok) return unpaidResponse(gate.sku);
-  return NextResponse.json(paidWisdom(sku, body, gate.mode));
+  return NextResponse.json(await paidWisdom(sku, body, gate.mode));
 }

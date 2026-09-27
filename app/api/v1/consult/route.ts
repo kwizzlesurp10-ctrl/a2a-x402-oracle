@@ -9,5 +9,5 @@ export async function POST(req: NextRequest) {
   const sku = skuById(String(body.sku || "oracle_ask")) || skuById("oracle_ask")!;
   const gate = gateRequest(req, sku.id);
   if (!gate.ok) return unpaidResponse(gate.sku);
-  return NextResponse.json(paidWisdom(sku, body, gate.mode));
+  return NextResponse.json(await paidWisdom(sku, body, gate.mode));
 }
