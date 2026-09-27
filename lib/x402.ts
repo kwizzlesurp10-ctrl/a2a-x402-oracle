@@ -1,11 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { USDC_BASE, facilitatorUrl, maxPriceUsd, network, payTo, siteUrl } from "./config";
 import { SKUS, Sku, skuById } from "./catalog";
-export type PaymentRequired = { x402Version: 2; error: string; accepts: Array<{ scheme: "exact"; network: string; maxAmountRequired: string; asset: string; payTo: string; resource: string; description: string; mimeType: string; maxTimeoutSeconds: number; extra?: Record<string, unknown> }> };
+export type PaymentRequired = {
+  x402Version: 2;
+  error?: string;
+  resource: { url: string; description: string; mimeType: string };
+  accepts: Array<{
+    scheme: string;
+    network: string;
+    amount: string;
+    asset: string;
+    payTo: string;
+    maxTimeoutSeconds: number;
+    extra?: Record<string, unknown>;
+  }>;
+};
 export function paymentRequiredBody(sku: Sku): PaymentRequired {
   const usd = Math.min(sku.priceUsd, maxPriceUsd());
   const atomic = String(Math.round(usd * 1_000_000));
-  return { x402Version: 2, error: "Payment required to invoke this Oracle skill", accepts: [{ scheme: "exact", network: network(), maxAmountRequired: atomic, asset: USDC_BASE, payTo: payTo(), resource: `${siteUrl()}${sku.httpPath}?sku=${sku.id}`, description: sku.description, mimeType: "application/json", maxTimeoutSeconds: 60, extra: { name: "A2A-x402 Oracle", serviceName: "x402 Oracle", sku: sku.id, amountUsd: usd, facilitator: facilitatorUrl(), assetSymbol: "USDC" } }] };
+  return {
+    x402Version: 2,
+    error: "Payment required to invoke this Oracle skill",
+    resource: {
+      url: `${siteUrl()}${sku.httpPath}?sku=${sku.id}`,
+      description: sku.description,
+      mimeType: "application/json"
+    },
+    accepts: [{
+      scheme: "exact",
+      network: network(),
+      amount: atomic,
+      asset: USDC_BASE,
+      payTo: payTo(),
+      maxTimeoutSeconds: 60,
+      extra: { name: "A2A-x402 Oracle", serviceName: "x402 Oracle", sku: sku.id, amountUsd: usd, facilitator: facilitatorUrl(), assetSymbol: "USDC" }
+    }]
+  };
 }
 export function paymentRequiredHeaders(sku: Sku): HeadersInit {
   return { "Content-Type": "application/json", "PAYMENT-REQUIRED": Buffer.from(JSON.stringify(paymentRequiredBody(sku)), "utf8").toString("base64"), "Cache-Control": "no-store" };
@@ -15,7 +45,33 @@ export function wellKnownX402() {
 }
 export function agentCard() {
   const url = siteUrl();
-  return { name: "A2A-x402 Oracle", description: "Oracle-402. Ranks A2A x402 calls that already collect money. Humans subscribe. Agents pay USDC.", url: `${url}/a2a`, version: "1.0.0", provider: { organization: "Local AI Integrations", url }, documentationUrl: `${url}/llms.txt`, defaultInputModes: ["application/json"], defaultOutputModes: ["application/json"], skills: SKUS.map((s) => ({ id: s.id, name: s.name, description: s.description, tags: ["x402", "a2a", "mcp", "oracle"], payment: s.free ? { protocol: "none", priceUsd: 0 } : { protocol: "x402", networks: [network()], asset: "USDC", priceUsd: s.priceUsd } })), payment: { protocol: "x402", networks: [network()], asset: "USDC", payTo: payTo(), facilitator: facilitatorUrl() } };
+  return {
+    name: "A2A-x402 Oracle",
+    description: "Oracle-402. Ranks A2A x402 calls that already collect money. Humans subscribe. Agents pay USDC.",
+    url: `${url}/a2a`,
+    version: "1.0.0",
+    provider: { organization: "Local AI Integrations", url },
+    documentationUrl: `${url}/llms.txt`,
+    defaultInputModes: ["application/json"],
+    defaultOutputModes: ["application/json"],
+    capabilities: {
+      extensions: [
+        {
+          uri: "https://github.com/google-agentic-commerce/a2a-x402/blob/main/spec/v0.2",
+          description: "Supports payments using the x402 protocol for on-chain settlement.",
+          required: true
+        }
+      ]
+    },
+    skills: SKUS.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      tags: ["x402", "a2a", "mcp", "oracle"],
+      payment: s.free ? { protocol: "none", priceUsd: 0 } : { protocol: "x402", networks: [network()], asset: "USDC", priceUsd: s.priceUsd }
+    })),
+    payment: { protocol: "x402", networks: [network()], asset: "USDC", payTo: payTo(), facilitator: facilitatorUrl() }
+  };
 }
 export function mcpManifest() {
   const url = siteUrl();
