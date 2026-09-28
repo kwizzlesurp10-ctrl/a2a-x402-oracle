@@ -1,3 +1,4 @@
+import { checkAndStoreNonce } from "./cache";
 import { NextRequest, NextResponse } from "next/server";
 import { USDC_BASE, facilitatorUrl, maxPriceUsd, network, payTo, siteUrl } from "./config";
 import { SKUS, Sku, skuById } from "./catalog";
@@ -80,18 +81,49 @@ export function mcpManifest() {
 function extractPaymentHeader(req: NextRequest) {
   return req.headers.get("PAYMENT-SIGNATURE") || req.headers.get("X-PAYMENT") || req.headers.get("payment-signature") || req.headers.get("x-payment");
 }
-export function gateRequest(req: NextRequest, skuId: string) {
+
+
+export async function gateRequest(req: NextRequest, skuId: string, metaPayment?: string) {
   const sku = skuById(skuId) || skuById("oracle_ask")!;
   if (sku.free) return { ok: true as const, mode: "free" as const };
+  
   const admin = process.env.ADMIN_TOKEN;
   const presented = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (admin && presented && presented === admin) return { ok: true as const, mode: "admin" as const };
-  const payment = extractPaymentHeader(req);
-  if (payment && payment.length > 16) {
-    if (process.env.X402_VERIFY_ENABLED === "true") return { ok: false as const, sku, body: paymentRequiredBody(sku) };
-    return { ok: true as const, mode: "header" as const };
+  
+  const payment = metaPayment || extractPaymentHeader(req);
+  if (!payment) return { ok: false as const, sku, body: paymentRequiredBody(sku) };
+
+  let paymentPayload;
+  try {
+    paymentPayload = JSON.parse(Buffer.from(payment, "base64").toString("utf-8"));
+  } catch (e) {
+    return { ok: false as const, sku, body: paymentRequiredBody(sku) };
   }
-  return { ok: false as const, sku, body: paymentRequiredBody(sku) };
+
+  // Idempotency check: hash of signature
+  const sig = paymentPayload?.payload?.signature;
+  if (!sig || !checkAndStoreNonce(sig, 60)) {
+    return { ok: false as const, sku, body: paymentRequiredBody(sku) };
+  }
+
+  if (process.env.X402_VERIFY_ENABLED === "true") {
+    try {
+      const requirements = paymentRequiredBody(sku).accepts[0];
+      const res = await fetch(facilitatorUrl() + "/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentPayload, paymentRequirements: requirements })
+      });
+      if (!res.ok) return { ok: false as const, sku, body: paymentRequiredBody(sku) };
+      const data = await res.json();
+      if (!data.isValid) return { ok: false as const, sku, body: paymentRequiredBody(sku) };
+    } catch (err) {
+      return { ok: false as const, sku, body: paymentRequiredBody(sku) };
+    }
+  }
+
+  return { ok: true as const, mode: "header" as const };
 }
 export function unpaidResponse(sku: Sku) {
   return NextResponse.json(paymentRequiredBody(sku), { status: 402, headers: paymentRequiredHeaders(sku) });

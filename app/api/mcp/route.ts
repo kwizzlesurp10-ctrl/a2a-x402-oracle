@@ -21,9 +21,22 @@ export async function POST(req: NextRequest) {
     const sku = skuById(name);
     if (!sku) return err(rpc.id, -32601, `Unknown tool ${name}`);
     if (sku.free) return ok(rpc.id, { content: [{ type: "text", text: JSON.stringify(healthPayload()) }] });
-    const gate = gateRequest(req, sku.id);
-    if (!gate.ok) return NextResponse.json({ jsonrpc: "2.0", id: rpc.id ?? null, error: { code: 402, message: "Payment required", data: paymentRequiredBody(gate.sku) } }, { status: 402 });
-    return ok(rpc.id, { content: [{ type: "text", text: JSON.stringify(await paidWisdom(sku, { ...args, sku: sku.id }, gate.mode)) }] });
+    const metaPayment = ((rpc.params as any)?._meta?.["x402/payment"] as string) || undefined;
+    const gate = await gateRequest(req, sku.id, metaPayment);
+    if (!gate.ok) {
+      // MCP x402 uses isError: true and structuredContent
+      const pr = paymentRequiredBody(gate.sku);
+      return ok(rpc.id, {
+        isError: true,
+        structuredContent: pr,
+        content: [{ type: "text", text: JSON.stringify(pr) }]
+      });
+    }
+    const resultPayload = await paidWisdom(sku, { ...args, sku: sku.id }, gate.mode);
+    return ok(rpc.id, {
+      content: [{ type: "text", text: JSON.stringify(resultPayload) }],
+      _meta: { "x402/payment-response": { status: "settled", receipt: resultPayload.receipt } }
+    });
   }
   return err(rpc.id, -32601, `Method not found: ${method}`);
 }

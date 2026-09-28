@@ -8,7 +8,12 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch { body = {}; }
   const allowed = String(body.sku || "oracle_demand_cycle") === "oracle_probe_call" ? "oracle_probe_call" : "oracle_demand_cycle";
   const sku = skuById(allowed)!;
-  const gate = gateRequest(req, sku.id);
+  const gate = await gateRequest(req, sku.id);
   if (!gate.ok) return unpaidResponse(gate.sku);
-  return NextResponse.json(await paidWisdom(sku, body, gate.mode));
+  const payload = await paidWisdom(sku, body, gate.mode);
+  const response = NextResponse.json(payload);
+  if (gate.mode === "header") {
+    response.headers.set("PAYMENT-RESPONSE", Buffer.from(JSON.stringify({ status: "settled", receipt: payload.receipt })).toString("base64"));
+  }
+  return response;
 }
