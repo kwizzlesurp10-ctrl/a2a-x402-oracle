@@ -1,12 +1,34 @@
-export const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA9D2bD";
+/** Official USDC on Base mainnet (eip155:8453). */
+export const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+/** Default payee when `X402_PAY_TO` is unset (Keith's Coinbase Base Account). */
+export const DEFAULT_X402_PAY_TO =
+  "0x0d25A44f74868eCE53B305C97139CF4B62963410";
+
+/** Retired payee — must not appear in challenges or env; funds may be unrecoverable. */
+export const RETIRED_X402_PAY_TO =
+  "0xAB745e5F576667037696e78ba7dA28E193E4423D";
+
+const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+
+function isRetiredPayTo(addr: string): boolean {
+  return addr.toLowerCase() === RETIRED_X402_PAY_TO.toLowerCase();
+}
 
 export function siteUrl(): string {
   return (process.env.NEXT_PUBLIC_SITE_URL || "https://a2a-x402-oracle.vercel.app").replace(/\/$/, "");
 }
 
 export function payTo(): string {
-  const addr = process.env.X402_PAY_TO || "0xAB745e5F576667037696e78ba7dA28E193E4423D";
-  if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) throw new Error("X402_PAY_TO must be a 20-byte hex address");
+  const addr = (process.env.X402_PAY_TO || DEFAULT_X402_PAY_TO).trim();
+  if (!ADDRESS_RE.test(addr)) {
+    throw new Error("X402_PAY_TO must be a 20-byte hex address");
+  }
+  if (isRetiredPayTo(addr)) {
+    throw new Error(
+      "X402_PAY_TO is set to a retired address; use Keith's Base Account wallet instead",
+    );
+  }
   return addr;
 }
 

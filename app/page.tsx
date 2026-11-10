@@ -25,7 +25,7 @@ export default function Page() {
           <h2>How an agent connects</h2>
           <pre className="snippet">{`curl -i -X POST ${url}/api/v1/consult -H 'content-type: application/json' -d '{"sku":"oracle_ask","question":"What is a live 402?"}'`}</pre>
         </section>
-        <footer className="footer"><div>A2A-x402 Oracle · burner payTo only</div><div><a href="/llms.txt">llms.txt</a></div></footer>
+        <footer className="footer"><div>A2A-x402 Oracle · USDC on Base</div><div><a href="/llms.txt">llms.txt</a></div></footer>
       </div>
     </main>
   );
