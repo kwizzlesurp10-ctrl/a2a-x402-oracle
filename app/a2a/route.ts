@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { skuById } from "@/lib/catalog";
 import { paidWisdom } from "@/lib/oracle-brain";
-import { agentCard, corsPreflight, finalizePaidRequest, gateRequest, unpaidResponse, sellerMisconfiguredResponse, settleFailedResponse } from "@/lib/x402";
+import {
+  agentCard,
+  applyPaymentResponseHeader,
+  corsPreflight,
+  finalizePaidRequest,
+  gateRequest,
+  unpaidResponse,
+  sellerMisconfiguredResponse,
+  settleFailedResponse,
+} from "@/lib/x402";
 
 export function OPTIONS() {
   return corsPreflight();
@@ -36,7 +45,7 @@ export async function POST(req: NextRequest) {
     if (!finalized.ok) {
       return settleFailedResponse(finalized.sku, finalized.body);
     }
-    return NextResponse.json({
+    const response = NextResponse.json({
       jsonrpc: "2.0",
       result: {
         task: { state: "completed", skill: sku.id },
@@ -44,6 +53,8 @@ export async function POST(req: NextRequest) {
         payment: { status: "settled", transaction: finalized.settleResponse.transaction },
       },
     });
+    applyPaymentResponseHeader(response, finalized.paymentResponseHeader);
+    return response;
   }
 
   return NextResponse.json({

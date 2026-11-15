@@ -10,7 +10,7 @@ Repo: https://github.com/kwizzlesurp10-ctrl/a2a-x402-oracle
 | `X402_PAY_TO` | **Yes (paid routes)** | Base mainnet payee, e.g. `0x0d25A44f74868eCE53B305C97139CF4B62963410`. **No default fallback** — if unset, paid routes return **503**. Never use retired `0xAB745…4423D` or `0x05e1…` addresses. |
 | `CDP_API_KEY_ID` | **Yes (paid routes)** | Coinbase Developer Platform API key ID for the x402 facilitator (`verify` / `settle`). Never log or commit. |
 | `CDP_API_KEY_SECRET` | **Yes (paid routes)** | CDP API key secret (Sensitive on Vercel). Never log or commit. |
-| `X402_FACILITATOR_URL` | Optional | Defaults to `https://api.cdp.coinbase.com/platform/v2/x402` |
+| `X402_FACILITATOR_URL` | Optional | Defaults to CDP production; when set, passed to `createCdpFacilitatorClient({ baseUrl })` so verify/settle JWTs target that host |
 | `X402_NETWORK` | Optional | Defaults to `eip155:8453` (Base mainnet) |
 | `MAX_PRICE_USD` | Optional | Defaults to `25` (cap 100) |
 | `ADMIN_TOKEN` | Optional | Bearer bypass for operator testing only; mark Sensitive |

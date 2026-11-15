@@ -4,7 +4,7 @@ import type { Network } from "@x402/core/types";
 import { x402ResourceServer } from "@x402/core/server";
 import { registerExactEvmScheme } from "@x402/evm/exact/server";
 import { bazaarResourceServerExtension } from "@x402/extensions/bazaar";
-import { network } from "./config";
+import { facilitatorUrl, network } from "./config";
 
 let cachedServer: x402ResourceServer | null = null;
 let initPromise: Promise<x402ResourceServer> | null = null;
@@ -28,6 +28,7 @@ function createFacilitator(): FacilitatorClient {
   return createCdpFacilitatorClient({
     apiKeyId: process.env.CDP_API_KEY_ID,
     apiKeySecret: process.env.CDP_API_KEY_SECRET,
+    baseUrl: facilitatorUrl(),
   });
 }
 

@@ -4,6 +4,7 @@ import { encodePaymentSignatureHeader } from "@x402/core/http";
 import type { PaymentPayload } from "@x402/core/types";
 import { DEFAULT_X402_PAY_TO } from "./config";
 import { skuById } from "./catalog";
+import { clearPaymentReplayGuardsForTests } from "./cache";
 import { createMockFacilitator } from "./test-facilitator";
 import { __setTestFacilitatorForTests, resetX402ResourceServerForTests } from "./x402-seller";
 import { finalizePaidRequest, gateRequest, paymentRequiredBody } from "./x402";
@@ -35,6 +36,7 @@ describe("x402 gate verify and settle", () => {
     vi.unstubAllEnvs();
     __setTestFacilitatorForTests(undefined);
     void resetX402ResourceServerForTests();
+    clearPaymentReplayGuardsForTests();
   });
 
   beforeEach(() => {
@@ -84,6 +86,49 @@ describe("x402 gate verify and settle", () => {
     if (!gate.ok || gate.mode !== "paid") throw new Error("expected verify pass");
     const finalized = await finalizePaidRequest(gate.verify);
     expect(finalized.ok).toBe(false);
+  });
+
+  it("releases replay guard after settle failure so verify can be retried", async () => {
+    const signature = "0xretry-after-settle-fail";
+    const header = await buildSignedPaymentHeader(signature);
+
+    __setTestFacilitatorForTests(createMockFacilitator({ settleSuccess: false }));
+    void resetX402ResourceServerForTests();
+    const first = await gateRequest(requestWithPayment(header), "oracle_ask");
+    expect(first.ok).toBe(true);
+    if (!first.ok || first.mode !== "paid") throw new Error("expected first verify");
+    await finalizePaidRequest(first.verify);
+
+    __setTestFacilitatorForTests(createMockFacilitator({ settleSuccess: true }));
+    void resetX402ResourceServerForTests();
+    const retry = await gateRequest(requestWithPayment(header), "oracle_ask");
+    expect(retry.ok).toBe(true);
+    if (!retry.ok || retry.mode !== "paid") throw new Error("expected retry verify after settle release");
+  });
+
+  it("blocks concurrent duplicate payment signatures while one is in flight", async () => {
+    const signature = "0xconcurrent-dup";
+    const header = await buildSignedPaymentHeader(signature);
+    const mock = createMockFacilitator();
+    let verifyCalls = 0;
+    __setTestFacilitatorForTests({
+      ...mock,
+      async verify(...args) {
+        verifyCalls += 1;
+        await new Promise((r) => setTimeout(r, 25));
+        return mock.verify!(...args);
+      },
+    });
+    void resetX402ResourceServerForTests();
+
+    const [first, second] = await Promise.all([
+      gateRequest(requestWithPayment(header), "oracle_ask"),
+      gateRequest(requestWithPayment(header), "oracle_ask"),
+    ]);
+
+    const okCount = [first, second].filter((g) => g.ok && g.mode === "paid").length;
+    expect(okCount).toBe(1);
+    expect(verifyCalls).toBe(1);
   });
 
   it("fails closed when payTo is missing", async () => {

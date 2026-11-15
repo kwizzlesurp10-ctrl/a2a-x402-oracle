@@ -1,4 +1,8 @@
-import { checkAndStoreNonce } from "./cache";
+import {
+  beginPaymentReplayGuard,
+  consumePaymentReplayGuard,
+  releasePaymentReplayGuard,
+} from "./cache";
 import { NextRequest, NextResponse } from "next/server";
 import type { Network, PaymentPayload, PaymentRequirements, PaymentRequired, ResourceInfo, SettleResponse } from "@x402/core/types";
 import {
@@ -18,6 +22,7 @@ export type PaidVerifyContext = {
   paymentPayload: PaymentPayload;
   requirements: PaymentRequirements;
   declaredExtensions: Record<string, unknown>;
+  replayKey: string;
 };
 
 export type GateResult =
@@ -46,9 +51,15 @@ function resourceInfoForSku(sku: Sku): ResourceInfo {
 
 function sellerReadyOr503(sku: Sku): { ok: true } | { ok: false; sku: Sku; status: 503; message: string } {
   if (!payToConfigured()) {
+    console.warn(
+      `[x402] Paid route rejected (503): X402_PAY_TO is missing or invalid (sku=${sku.id}, path=${sku.httpPath})`,
+    );
     return { ok: false, sku, status: 503, message: "X402_PAY_TO is not configured" };
   }
   if (!hasCdpCredentials()) {
+    console.warn(
+      `[x402] Paid route rejected (503): CDP_API_KEY_ID or CDP_API_KEY_SECRET is missing (sku=${sku.id})`,
+    );
     return { ok: false, sku, status: 503, message: "CDP facilitator credentials are not configured" };
   }
   return { ok: true };
@@ -227,7 +238,10 @@ export async function gateRequest(
   }
 
   const replayKey = replayKeyFromPayload(paymentPayload);
-  if (!replayKey || !checkAndStoreNonce(replayKey, 120)) {
+  if (!replayKey) {
+    return { ok: false, sku, body: await paymentRequiredBody(sku, mcp), status: 402 };
+  }
+  if (!beginPaymentReplayGuard(replayKey)) {
     return { ok: false, sku, body: await paymentRequiredBody(sku, mcp), status: 402 };
   }
 
@@ -240,16 +254,18 @@ export async function gateRequest(
   try {
     const verifyResult = await server.verifyPayment(paymentPayload, requirements, declaredExtensions);
     if (!verifyResult.isValid) {
+      releasePaymentReplayGuard(replayKey);
       return { ok: false, sku, body: await paymentRequiredBody(sku, mcp), status: 402 };
     }
   } catch {
+    releasePaymentReplayGuard(replayKey);
     return { ok: false, sku, body: await paymentRequiredBody(sku, mcp), status: 402 };
   }
 
   return {
     ok: true,
     mode: "paid",
-    verify: { sku, paymentPayload, requirements, declaredExtensions },
+    verify: { sku, paymentPayload, requirements, declaredExtensions, replayKey },
   };
 }
 
@@ -262,6 +278,7 @@ export async function finalizePaidRequest(verify: PaidVerifyContext, mcp = false
       verify.declaredExtensions,
     );
     if (!settleResponse.success) {
+      releasePaymentReplayGuard(verify.replayKey);
       return {
         ok: false,
         sku: verify.sku,
@@ -269,12 +286,14 @@ export async function finalizePaidRequest(verify: PaidVerifyContext, mcp = false
         status: 402,
       };
     }
+    consumePaymentReplayGuard(verify.replayKey);
     return {
       ok: true,
       settleResponse,
       paymentResponseHeader: encodePaymentResponseHeader(settleResponse),
     };
   } catch {
+    releasePaymentReplayGuard(verify.replayKey);
     return {
       ok: false,
       sku: verify.sku,
