@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
           { key: "Access-Control-Allow-Origin", value: "*" },
           { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization, PAYMENT-SIGNATURE, X-PAYMENT, PAYMENT-REQUIRED, X-Agent-Id" },
           { key: "Access-Control-Allow-Methods", value: "GET, POST, OPTIONS" },
-          { key: "Access-Control-Expose-Headers", value: "PAYMENT-REQUIRED" },
+          { key: "Access-Control-Expose-Headers", value: "PAYMENT-REQUIRED, PAYMENT-RESPONSE" },
         ],
       },
     ];
