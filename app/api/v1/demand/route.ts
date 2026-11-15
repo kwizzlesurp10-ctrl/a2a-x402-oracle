@@ -1,19 +1,40 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { skuById } from "@/lib/catalog";
 import { paidWisdom } from "@/lib/oracle-brain";
-import { corsPreflight, gateRequest, unpaidResponse } from "@/lib/x402";
-export function OPTIONS() { return corsPreflight(); }
+import { corsPreflight, finalizePaidRequest, gateRequest } from "@/lib/x402";
+import { jsonWithOptionalPayment, responseForGate } from "@/lib/x402-route";
+
+export function OPTIONS() {
+  return corsPreflight();
+}
+
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown> = {};
-  try { body = await req.json(); } catch { body = {}; }
-  const allowed = String(body.sku || "oracle_demand_cycle") === "oracle_probe_call" ? "oracle_probe_call" : "oracle_demand_cycle";
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+  const allowed =
+    String(body.sku || "oracle_demand_cycle") === "oracle_probe_call"
+      ? "oracle_probe_call"
+      : "oracle_demand_cycle";
   const sku = skuById(allowed)!;
   const gate = await gateRequest(req, sku.id);
-  if (!gate.ok) return unpaidResponse(gate.sku);
-  const payload = await paidWisdom(sku, body, gate.mode);
-  const response = NextResponse.json(payload);
-  if (gate.mode === "header") {
-    response.headers.set("PAYMENT-RESPONSE", Buffer.from(JSON.stringify({ status: "settled", receipt: payload.receipt })).toString("base64"));
+  const blocked = responseForGate(gate);
+  if (blocked) return blocked;
+
+  const payload = await paidWisdom(sku, body, gate.ok ? gate.mode : "free");
+
+  if (gate.ok && gate.mode === "paid") {
+    const finalized = await finalizePaidRequest(gate.verify);
+    return jsonWithOptionalPayment(
+      finalized.ok
+        ? { ...payload, receipt: { ...payload.receipt, paid: true, mode: "settled" } }
+        : payload,
+      finalized,
+    );
   }
-  return response;
+
+  return jsonWithOptionalPayment(payload, null);
 }

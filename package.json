@@ -11,6 +11,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@coinbase/cdp-sdk": "^1.62.0",
+    "@x402/core": "^2.31.0",
+    "@x402/evm": "^2.31.0",
+    "@x402/extensions": "^2.31.0",
+    "@x402/svm": "^2.31.0",
     "next": "^15.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

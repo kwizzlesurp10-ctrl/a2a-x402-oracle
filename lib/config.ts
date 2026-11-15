@@ -1,7 +1,7 @@
 /** Official USDC on Base mainnet (eip155:8453). */
 export const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
-/** Default payee when `X402_PAY_TO` is unset (Keith's Coinbase Base Account). */
+/** Documented production payee (must be set explicitly via `X402_PAY_TO`). */
 export const DEFAULT_X402_PAY_TO =
   "0x0d25A44f74868eCE53B305C97139CF4B62963410";
 
@@ -20,7 +20,10 @@ export function siteUrl(): string {
 }
 
 export function payTo(): string {
-  const addr = (process.env.X402_PAY_TO || DEFAULT_X402_PAY_TO).trim();
+  const addr = process.env.X402_PAY_TO?.trim();
+  if (!addr) {
+    throw new Error("X402_PAY_TO is required for paid routes");
+  }
   if (!ADDRESS_RE.test(addr)) {
     throw new Error("X402_PAY_TO must be a 20-byte hex address");
   }
@@ -30,6 +33,11 @@ export function payTo(): string {
     );
   }
   return addr;
+}
+
+export function payToConfigured(): boolean {
+  const addr = process.env.X402_PAY_TO?.trim();
+  return Boolean(addr && ADDRESS_RE.test(addr) && !isRetiredPayTo(addr));
 }
 
 export function network(): string {
